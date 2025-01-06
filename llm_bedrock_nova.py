@@ -1,5 +1,4 @@
 import os
-import json
 import mimetypes
 from io import BytesIO
 from base64 import b64encode, b64decode
@@ -54,15 +53,17 @@ class BedrockNova(llm.Model):
     """
     Model class to invoke Nova on Amazon Bedrock via the Converse API.
     """
+
     can_stream: bool = True
 
     class Options(llm.Options):
         """
         Parameters that users can optionally override.
         """
+
         max_tokens_to_sample: Optional[int] = Field(
             description="The maximum number of tokens to generate before stopping",
-            default=4096
+            default=4096,
         )
         bedrock_model_id: Optional[str] = Field(
             description="Bedrock modelId or ARN of base, custom, or provisioned model",
@@ -106,28 +107,23 @@ class BedrockNova(llm.Model):
 
             # If the image is already in a supported format and no resize was done,
             # we can keep the original bytes
-            if (
-                img_format.lower() in BEDROCK_CONVERSE_IMAGE_FORMATS
-                and img.size == (width, height)
+            if img_format.lower() in BEDROCK_CONVERSE_IMAGE_FORMATS and img.size == (
+                width,
+                height,
             ):
                 return img_bytes, img_format.lower()
 
             # Otherwise, re-export the image as PNG
             with BytesIO() as buffer:
-                img.save(buffer, format='PNG')
-                return buffer.getvalue(), 'png'
+                img.save(buffer, format="PNG")
+                return buffer.getvalue(), "png"
 
     def image_path_to_content_block(self, file_path):
         """
         Create a Bedrock Converse content block from the given image file path.
         """
         source_bytes, file_format = self.load_and_preprocess_image(file_path)
-        return {
-            'image': {
-                'format': file_format,
-                'source': {'bytes': source_bytes}
-            }
-        }
+        return {"image": {"format": file_format, "source": {"bytes": source_bytes}}}
 
     @staticmethod
     def sanitize_file_name(file_path):
@@ -142,7 +138,10 @@ class BedrockNova(llm.Model):
         """
         head, tail = os.path.split(file_path)
         for c in tail:
-            if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_()[]":
+            if (
+                c
+                not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_()[]"
+            ):
                 tail = tail.replace(c, "_")
         return tail[:200] if tail else "file"
 
@@ -154,10 +153,10 @@ class BedrockNova(llm.Model):
             source_bytes = fp.read()
 
         return {
-            'document': {
-                'format': MIME_TYPE_TO_BEDROCK_CONVERSE_DOCUMENT_FORMAT[mime_type],
-                'name': self.sanitize_file_name(file_path),
-                'source': {'bytes': source_bytes}
+            "document": {
+                "format": MIME_TYPE_TO_BEDROCK_CONVERSE_DOCUMENT_FORMAT[mime_type],
+                "name": self.sanitize_file_name(file_path),
+                "source": {"bytes": source_bytes},
             }
         }
 
@@ -170,7 +169,7 @@ class BedrockNova(llm.Model):
 
         # If user wants to attach files (images/documents), parse them
         if prompt.options.bedrock_attach:
-            for file_path in prompt.options.bedrock_attach.split(','):
+            for file_path in prompt.options.bedrock_attach.split(","):
                 file_path = os.path.expanduser(file_path.strip())
                 mime_type, _ = mimetypes.guess_type(file_path)
                 if not mime_type:
@@ -179,12 +178,14 @@ class BedrockNova(llm.Model):
                 if mime_type.startswith("image/"):
                     content.append(self.image_path_to_content_block(file_path))
                 elif mime_type in MIME_TYPE_TO_BEDROCK_CONVERSE_DOCUMENT_FORMAT:
-                    content.append(self.document_path_to_content_block(file_path, mime_type))
+                    content.append(
+                        self.document_path_to_content_block(file_path, mime_type)
+                    )
                 else:
                     raise ValueError(f"Unsupported file type for file: {file_path}")
 
         # Always append the prompt text
-        content.append({'text': prompt.prompt})
+        content.append({"text": prompt.prompt})
         return content
 
     def encode_bytes(self, o):
@@ -197,8 +198,8 @@ class BedrockNova(llm.Model):
         elif isinstance(o, dict):
             result = {}
             for key, value in o.items():
-                if key == 'bytes':
-                    result['bytes_b64'] = b64encode(value).decode("utf-8")
+                if key == "bytes":
+                    result["bytes_b64"] = b64encode(value).decode("utf-8")
                 else:
                     result[key] = self.encode_bytes(value)
             return result
@@ -215,8 +216,8 @@ class BedrockNova(llm.Model):
         elif isinstance(o, dict):
             result = {}
             for key, value in o.items():
-                if key == 'bytes_b64':
-                    result['bytes'] = b64decode(value)
+                if key == "bytes_b64":
+                    result["bytes"] = b64decode(value)
                 else:
                     result[key] = self.decode_bytes(value)
             return result
@@ -231,13 +232,15 @@ class BedrockNova(llm.Model):
         messages = []
         if conversation:
             for resp in conversation.responses:
-                if resp.response_json and 'bedrock_user_content' in resp.response_json:
-                    user_content = self.decode_bytes(resp.response_json['bedrock_user_content'])
+                if resp.response_json and "bedrock_user_content" in resp.response_json:
+                    user_content = self.decode_bytes(
+                        resp.response_json["bedrock_user_content"]
+                    )
                 else:
                     # Fallback if user content is not saved in response_json
-                    user_content = [{'text': resp.prompt.prompt}]
+                    user_content = [{"text": resp.prompt.prompt}]
 
-                assistant_content = [{'text': resp.text()}]
+                assistant_content = [{"text": resp.text()}]
 
                 messages.append({"role": "user", "content": user_content})
                 messages.append({"role": "assistant", "content": assistant_content})
@@ -261,33 +264,31 @@ class BedrockNova(llm.Model):
 
         # Preserve user content in response so it can be reused in future conversation steps
         response.response_json = {
-            'bedrock_user_content': self.encode_bytes(prompt_content)
+            "bedrock_user_content": self.encode_bytes(prompt_content)
         }
 
         # Basic inferenceConfig; add or remove parameters as needed
-        inference_config = {
-            'maxTokens': prompt.options.max_tokens_to_sample
-        }
+        inference_config = {"maxTokens": prompt.options.max_tokens_to_sample}
 
         # Construct parameters for the Bedrock Converse API
         params = {
-            'modelId': bedrock_model_id,
-            'messages': messages,
-            'inferenceConfig': inference_config,
+            "modelId": bedrock_model_id,
+            "messages": messages,
+            "inferenceConfig": inference_config,
         }
 
         # If a system prompt is available, add it
         if prompt.system:
-            params['system'] = [{'text': prompt.system}]
+            params["system"] = [{"text": prompt.system}]
 
         # Create Bedrock client (adjust region if necessary)
-        client = boto3.client('bedrock-runtime')
+        client = boto3.client("bedrock-runtime")
 
         if stream:
             # Streaming response
             bedrock_response = client.converse_stream(**params)
-            for event in bedrock_response['stream']:
-                (event_type, event_content), = event.items()
+            for event in bedrock_response["stream"]:
+                ((event_type, event_content),) = event.items()
                 if event_type == "contentBlockDelta":
                     text_chunk = event_content["delta"]["text"]
                     yield text_chunk
@@ -295,5 +296,5 @@ class BedrockNova(llm.Model):
             # Non-streaming response
             bedrock_response = client.converse(**params)
             # The last message from the assistant is bedrock_response['output']['message']['content'][-1]['text']
-            completion = bedrock_response['output']['message']['content'][-1]['text']
+            completion = bedrock_response["output"]["message"]["content"][-1]["text"]
             yield completion
