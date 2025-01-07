@@ -73,6 +73,16 @@ class BedrockNova(llm.Model):
             description="Attach the given image or document file(s) to the prompt (comma-separated if multiple).",
             default=None,
         )
+        temperature: Optional[float] = Field(
+            description=(
+                "Controls the randomness of the output. Use higher values for "
+                "more creative responses, and lower values for more "
+                "deterministic responses."
+            ),
+            default=None,
+            ge=0.0,
+            le=2.0,
+        )
 
         @field_validator("max_tokens_to_sample")
         def validate_length(cls, max_tokens_to_sample):
@@ -269,6 +279,10 @@ class BedrockNova(llm.Model):
 
         # Basic inferenceConfig; add or remove parameters as needed
         inference_config = {"maxTokens": prompt.options.max_tokens_to_sample}
+
+        # Add temperature to inferenceConfig if provided
+        if prompt.options.temperature is not None:
+            inference_config["temperature"] = prompt.options.temperature
 
         # Construct parameters for the Bedrock Converse API
         params = {
