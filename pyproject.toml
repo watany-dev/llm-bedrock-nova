@@ -11,6 +11,7 @@ classifiers = [
 
 dependencies = [
     "boto3>=1.35.92",
+    "httpx>=0.28.1",
     "pillow>=11.1.0",
 ]
 

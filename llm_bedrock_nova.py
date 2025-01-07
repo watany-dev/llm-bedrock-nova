@@ -3,6 +3,8 @@ import mimetypes
 from io import BytesIO
 from base64 import b64encode, b64decode
 from typing import Optional, List
+import sys
+from httpx import request
 
 import boto3
 from PIL import Image
@@ -55,6 +57,17 @@ class BedrockNova(llm.Model):
     """
 
     can_stream: bool = True
+    attachment_types = (
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "audio/wav",
+        "audio/mp3",
+        "video/mp4",
+        "video/mpeg",
+        "video/webm",
+    )
 
     class Options(llm.Options):
         """
@@ -69,8 +82,15 @@ class BedrockNova(llm.Model):
             description="Bedrock modelId or ARN of base, custom, or provisioned model",
             default=None,
         )
-        bedrock_attach: Optional[str] = Field(
-            description="Attach the given image or document file(s) to the prompt (comma-separated if multiple).",
+        bedrock_attach: Optional[List[str]] = Field(
+            description=(
+                "Attach the given image, audio, or video file(s) to the prompt "
+                "(comma-separated if multiple). Accepts file paths, URLs, or '-' for stdin."
+            ),
+            default=None,
+        )
+        attachment_type: Optional[str] = Field(
+            description="Specify MIME type for attachments if automatic detection fails.",
             default=None,
         )
         temperature: Optional[float] = Field(
@@ -170,6 +190,37 @@ class BedrockNova(llm.Model):
             }
         }
 
+    def load_attachment(self, file_path, mime_type=None):
+        """
+        Load and preprocess an attachment (image/audio/video).
+        Supports file paths, URLs, and standard input.
+        """
+        if file_path == "-":  # Read from stdin
+            file_content = BytesIO(sys.stdin.buffer.read())
+        elif file_path.startswith("http://") or file_path.startswith("https://"):
+            # Download file from URL
+            response = request.get(file_path)
+            response.raise_for_status()
+            file_content = BytesIO(response.content)
+        else:  # Read from file path
+            with open(file_path, "rb") as fp:
+                file_content = BytesIO(fp.read())
+
+        # Detect MIME type if not provided
+        if not mime_type:
+            mime_type, _ = mimetypes.guess_type(file_path)
+
+        if not mime_type or mime_type not in self.attachment_types:
+            raise ValueError(f"Unsupported attachment type: {mime_type or 'unknown'}")
+
+        # Return as a content block
+        return {
+            "inlineData": {
+                "data": b64encode(file_content.getvalue()).decode("utf-8"),
+                "mimeType": mime_type,
+            }
+        }
+
     def prompt_to_content(self, prompt):
         """
         Convert an llm.Prompt into a list of Bedrock Converse content blocks.
@@ -177,22 +228,12 @@ class BedrockNova(llm.Model):
         """
         content = []
 
-        # If user wants to attach files (images/documents), parse them
+        # If user wants to attach files (images/documents/audio/video), parse them
         if prompt.options.bedrock_attach:
-            for file_path in prompt.options.bedrock_attach.split(","):
+            for file_path in prompt.options.bedrock_attach:
                 file_path = os.path.expanduser(file_path.strip())
-                mime_type, _ = mimetypes.guess_type(file_path)
-                if not mime_type:
-                    raise ValueError(f"Unable to guess mime type for file: {file_path}")
-
-                if mime_type.startswith("image/"):
-                    content.append(self.image_path_to_content_block(file_path))
-                elif mime_type in MIME_TYPE_TO_BEDROCK_CONVERSE_DOCUMENT_FORMAT:
-                    content.append(
-                        self.document_path_to_content_block(file_path, mime_type)
-                    )
-                else:
-                    raise ValueError(f"Unsupported file type for file: {file_path}")
+                mime_type = prompt.options.attachment_type
+                content.append(self.load_attachment(file_path, mime_type))
 
         # Always append the prompt text
         content.append({"text": prompt.prompt})
