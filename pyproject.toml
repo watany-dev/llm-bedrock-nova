@@ -1,12 +1,28 @@
 [project]
 name = "llm-bedrock-nova"
 version = "0.1.0"
+description = "LLM plugin for Amazon's Nova on AWS Bedrock"
 readme = "README.md"
-requires-python = ">=3.12"
+authors = [{name = "Sean Blakey"}, {name = "Will Sorenson"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
+
 dependencies = [
     "boto3>=1.35.92",
     "pillow>=11.1.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "ruff>=0.8.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/watany-dev/llm-bedrock-nova"
+
 [project.entry-points.llm]
 bedrock-nova = "llm_bedrock_nova"
+
