@@ -28,13 +28,13 @@ Homepage = "https://github.com/watany-dev/llm-bedrock-nova"
 bedrock-nova = "llm_bedrock_nova"
 
 [tool.ruff]
-line-length = 90
+line-length = 100
 
 [tool.ruff.format]
 docstring-code-format = true
 
 [tool.ruff.lint]
-select = ["ALL"]
+select = ["E", "F", "W"]
 ignore = [
     "COM812",
     "ISC001", 

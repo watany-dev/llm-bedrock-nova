@@ -33,8 +33,7 @@ NOVA_MAX_IMAGE_LONG_SIZE = 1568
 
 @llm.hookimpl
 def register_models(register):
-    """Register Amazon Nova models with llm. You can change aliases as desired.
-    """
+    """Register Amazon Nova models with llm. You can change aliases as desired."""
     register(
         BedrockNova("amazon.nova-pro-v1:0"),
         aliases=("bedrock-nova-pro", "nova-pro"),
@@ -50,8 +49,7 @@ def register_models(register):
 
 
 class BedrockNova(llm.Model):
-    """Model class to invoke Nova on Amazon Bedrock via the Converse API.
-    """
+    """Model class to invoke Nova on Amazon Bedrock via the Converse API."""
 
     can_stream: bool = True
     attachment_types = (
@@ -67,8 +65,7 @@ class BedrockNova(llm.Model):
     )
 
     class Options(llm.Options):
-        """Parameters that users can optionally override.
-        """
+        """Parameters that users can optionally override."""
 
         max_tokens_to_sample: Optional[int] = Field(
             description="The maximum number of tokens to generate before stopping",
@@ -107,8 +104,7 @@ class BedrockNova(llm.Model):
             return max_tokens_to_sample
 
     def __init__(self, model_id):
-        """:param model_id: The modelId for invocation on Bedrock (e.g., amazon.nova-pro-v1:0).
-        """
+        """:param model_id: The modelId for invocation on Bedrock (e.g., amazon.nova-pro-v1:0)."""
         self.model_id = model_id
 
     @staticmethod
@@ -143,8 +139,7 @@ class BedrockNova(llm.Model):
                 return buffer.getvalue(), "png"
 
     def image_path_to_content_block(self, file_path):
-        """Create a Bedrock Converse content block from the given image file path.
-        """
+        """Create a Bedrock Converse content block from the given image file path."""
         source_bytes, file_format = self.load_and_preprocess_image(file_path)
         return {"image": {"format": file_format, "source": {"bytes": source_bytes}}}
 
@@ -160,16 +155,12 @@ class BedrockNova(llm.Model):
         """
         head, tail = os.path.split(file_path)
         for c in tail:
-            if (
-                c
-                not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_()[]"
-            ):
+            if c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_()[]":
                 tail = tail.replace(c, "_")
         return tail[:200] if tail else "file"
 
     def document_path_to_content_block(self, file_path, mime_type):
-        """Create a Bedrock Converse content block from the given document file path.
-        """
+        """Create a Bedrock Converse content block from the given document file path."""
         with open(file_path, "rb") as fp:
             source_bytes = fp.read()
 
@@ -268,9 +259,7 @@ class BedrockNova(llm.Model):
         if conversation:
             for resp in conversation.responses:
                 if resp.response_json and "bedrock_user_content" in resp.response_json:
-                    user_content = self.decode_bytes(
-                        resp.response_json["bedrock_user_content"]
-                    )
+                    user_content = self.decode_bytes(resp.response_json["bedrock_user_content"])
                 else:
                     # Fallback if user content is not saved in response_json
                     user_content = [{"text": resp.prompt.prompt}]
@@ -289,7 +278,8 @@ class BedrockNova(llm.Model):
         This constructs Bedrock Converse request parameters, then calls
         either 'converse' or 'converse_stream'.
         """
-        # If a custom bedrock_model_id is provided, use that, otherwise use the default self.model_id
+        # If a custom bedrock_model_id is provided,
+        # use that, otherwise use the default self.model_id
         bedrock_model_id = prompt.options.bedrock_model_id or self.model_id
 
         # Build the prompt content and conversation
@@ -297,9 +287,7 @@ class BedrockNova(llm.Model):
         messages = self.build_messages(prompt_content, conversation)
 
         # Preserve user content in response so it can be reused in future conversation steps
-        response.response_json = {
-            "bedrock_user_content": self.encode_bytes(prompt_content)
-        }
+        response.response_json = {"bedrock_user_content": self.encode_bytes(prompt_content)}
 
         # Basic inferenceConfig; add or remove parameters as needed
         inference_config = {"maxTokens": prompt.options.max_tokens_to_sample}
@@ -333,6 +321,7 @@ class BedrockNova(llm.Model):
         else:
             # Non-streaming response
             bedrock_response = client.converse(**params)
-            # The last message from the assistant is bedrock_response['output']['message']['content'][-1]['text']
+            # The last message from the assistant is
+            # bedrock_response['output']['message']['content'][-1]['text']
             completion = bedrock_response["output"]["message"]["content"][-1]["text"]
             yield completion
