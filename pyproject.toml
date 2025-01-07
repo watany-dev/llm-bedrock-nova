@@ -1,3 +1,4 @@
+
 [project]
 name = "llm-bedrock-nova"
 version = "0.1.0"
@@ -10,3 +11,9 @@ dependencies = [
 
 [project.entry-points.llm]
 bedrock-nova = "llm_bedrock_nova"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+    "ruff>=0.8.6",
+]

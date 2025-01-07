@@ -20,6 +20,8 @@ uv:
 	chmod +x uv
 	mkdir -p $(INSTALL_DIR)
 	mv uv $(INSTALL_DIR)
+	uv
+	uv sync
 	@echo "uv installed in $(INSTALL_DIR)"
 
 # Download, extract, and install awscli v2
