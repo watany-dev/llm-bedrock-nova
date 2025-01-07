@@ -1,16 +1,15 @@
-import os
 import mimetypes
-from io import BytesIO
-from base64 import b64encode, b64decode
-from typing import Optional, List
+import os
 import sys
-from httpx import request
+from base64 import b64decode, b64encode
+from io import BytesIO
+from typing import List, Optional
 
 import boto3
+import llm
+from httpx import request
 from PIL import Image
 from pydantic import Field, field_validator
-
-import llm
 
 # Supported image formats for the Bedrock Converse API
 BEDROCK_CONVERSE_IMAGE_FORMATS = ["png", "jpeg", "gif", "webp"]
@@ -34,8 +33,7 @@ NOVA_MAX_IMAGE_LONG_SIZE = 1568
 
 @llm.hookimpl
 def register_models(register):
-    """
-    Register Amazon Nova models with llm. You can change aliases as desired.
+    """Register Amazon Nova models with llm. You can change aliases as desired.
     """
     register(
         BedrockNova("amazon.nova-pro-v1:0"),
@@ -52,8 +50,7 @@ def register_models(register):
 
 
 class BedrockNova(llm.Model):
-    """
-    Model class to invoke Nova on Amazon Bedrock via the Converse API.
+    """Model class to invoke Nova on Amazon Bedrock via the Converse API.
     """
 
     can_stream: bool = True
@@ -70,8 +67,7 @@ class BedrockNova(llm.Model):
     )
 
     class Options(llm.Options):
-        """
-        Parameters that users can optionally override.
+        """Parameters that users can optionally override.
         """
 
         max_tokens_to_sample: Optional[int] = Field(
@@ -111,15 +107,13 @@ class BedrockNova(llm.Model):
             return max_tokens_to_sample
 
     def __init__(self, model_id):
-        """
-        :param model_id: The modelId for invocation on Bedrock (e.g., amazon.nova-pro-v1:0).
+        """:param model_id: The modelId for invocation on Bedrock (e.g., amazon.nova-pro-v1:0).
         """
         self.model_id = model_id
 
     @staticmethod
     def load_and_preprocess_image(file_path):
-        """
-        Load and preprocess the given image for use with the Bedrock Converse API.
+        """Load and preprocess the given image for use with the Bedrock Converse API.
         * Resize if needed.
         * Convert to a supported format if needed.
         * Return (raw_bytes, format).
@@ -149,16 +143,14 @@ class BedrockNova(llm.Model):
                 return buffer.getvalue(), "png"
 
     def image_path_to_content_block(self, file_path):
-        """
-        Create a Bedrock Converse content block from the given image file path.
+        """Create a Bedrock Converse content block from the given image file path.
         """
         source_bytes, file_format = self.load_and_preprocess_image(file_path)
         return {"image": {"format": file_format, "source": {"bytes": source_bytes}}}
 
     @staticmethod
     def sanitize_file_name(file_path):
-        """
-        Generate a sanitized file name that conforms to the Bedrock Converse API constraints:
+        """Generate a sanitized file name that conforms to the Bedrock Converse API constraints:
         * Alphanumeric characters
         * Whitespace characters (no more than one in a row)
         * Hyphens
@@ -176,8 +168,7 @@ class BedrockNova(llm.Model):
         return tail[:200] if tail else "file"
 
     def document_path_to_content_block(self, file_path, mime_type):
-        """
-        Create a Bedrock Converse content block from the given document file path.
+        """Create a Bedrock Converse content block from the given document file path.
         """
         with open(file_path, "rb") as fp:
             source_bytes = fp.read()
@@ -191,8 +182,7 @@ class BedrockNova(llm.Model):
         }
 
     def load_attachment(self, file_path, mime_type=None):
-        """
-        Load and preprocess an attachment (image/audio/video).
+        """Load and preprocess an attachment (image/audio/video).
         Supports file paths, URLs, and standard input.
         """
         if file_path == "-":  # Read from stdin
@@ -222,8 +212,7 @@ class BedrockNova(llm.Model):
         }
 
     def prompt_to_content(self, prompt):
-        """
-        Convert an llm.Prompt into a list of Bedrock Converse content blocks.
+        """Convert an llm.Prompt into a list of Bedrock Converse content blocks.
         This also attaches any files if 'bedrock_attach' is specified.
         """
         content = []
@@ -240,13 +229,12 @@ class BedrockNova(llm.Model):
         return content
 
     def encode_bytes(self, o):
-        """
-        Recursively replace any 'bytes' key in the object with a base64-encoded value
+        """Recursively replace any 'bytes' key in the object with a base64-encoded value
         (renamed to 'bytes_b64').
         """
         if isinstance(o, list):
             return [self.encode_bytes(i) for i in o]
-        elif isinstance(o, dict):
+        if isinstance(o, dict):
             result = {}
             for key, value in o.items():
                 if key == "bytes":
@@ -254,17 +242,15 @@ class BedrockNova(llm.Model):
                 else:
                     result[key] = self.encode_bytes(value)
             return result
-        else:
-            return o
+        return o
 
     def decode_bytes(self, o):
-        """
-        Recursively replace any 'bytes_b64' key in the object with a base64-decoded value
+        """Recursively replace any 'bytes_b64' key in the object with a base64-decoded value
         (restoring the 'bytes' key).
         """
         if isinstance(o, list):
             return [self.decode_bytes(i) for i in o]
-        elif isinstance(o, dict):
+        if isinstance(o, dict):
             result = {}
             for key, value in o.items():
                 if key == "bytes_b64":
@@ -272,12 +258,10 @@ class BedrockNova(llm.Model):
                 else:
                     result[key] = self.decode_bytes(value)
             return result
-        else:
-            return o
+        return o
 
     def build_messages(self, prompt_content, conversation) -> List[dict]:
-        """
-        Convert any previous conversation data into the required message structure for
+        """Convert any previous conversation data into the required message structure for
         the Bedrock Converse API, then append the current user content.
         """
         messages = []
@@ -301,8 +285,7 @@ class BedrockNova(llm.Model):
         return messages
 
     def execute(self, prompt, stream, response, conversation):
-        """
-        The main execution method for llm.Model.
+        """The main execution method for llm.Model.
         This constructs Bedrock Converse request parameters, then calls
         either 'converse' or 'converse_stream'.
         """
