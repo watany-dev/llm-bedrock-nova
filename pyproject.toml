@@ -51,3 +51,8 @@ logger-objects = ["src.library.logger.LOGGER"]
 
 [tool.ruff.lint.pylint]
 max-args = 6
+
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
